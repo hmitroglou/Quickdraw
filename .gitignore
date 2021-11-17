@@ -1,6 +1,6 @@
 .DS_Store
 dataset
 quick_draw_subset
-.ipynb_checkpoints
+training_quickdraw/.ipynb_checkpoints
 .ipynb
 # Redo_QuickDraw

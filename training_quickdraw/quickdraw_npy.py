@@ -1,18 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
-
-
-conda clean -tipsy
-
-
-# In[2]:
+# In[47]:
 
 
 import tensorflow as tf
-#import tensorflow_datasets as tfds
-#from sklearn.model_selection import train_test_split
 
 import numpy as np
 from numpy import asarray
@@ -20,13 +12,9 @@ from numpy import asarray
 import matplotlib.pyplot as plt 
 from matplotlib import image
 
-import random as rd
 import math as m
 from PIL import Image
 import random
-
-from sklearn.model_selection import train_test_split
-from sklearn.utils import shuffle
 
 import requests as req
 import csv
@@ -38,7 +26,7 @@ import copy
 print(tf.__version__)
 
 
-# In[1]:
+# In[78]:
 
 
 def download_npy(categories,number_of_samples):
@@ -70,7 +58,7 @@ def load_data(name,n):
     return data[0:n,:]
 
 #randomize data and labels
-def shuff(data,label,seed):
+def shuff(data,label):
     
     s = np.shape(data)
     n = s[0]
@@ -88,19 +76,21 @@ def shuff(data,label,seed):
         m = s[1]
         data_new = np.zeros((n,m))
     
+    orderid = random.sample(range(n), n)
     
-    l1 = list(range(n))
-    l2 = list(range(n))
-    np.random.seed(seed)
-    np.random.shuffle(l1)
-    np.random.seed(seed)
-    np.random.shuffle(l2)   
+    #l1 = list(range(n))
+    #l2 = list(range(n))
+    ##Kernel dies
+    #np.random.seed(seed) 
+    #np.random.shuffle(l1)
+    #np.random.seed(seed)
+    #np.random.shuffle(l2)   
     
     for i in range(n):
-        data_new[i] = data[l1[i]]
-        label_new[i] = int(label[l2[i]])
+        data_new[i] = data[orderid[i]]
+        label_new[i] = int(label[orderid[i]])
         
-    del data, label
+    #del data, label
     return data_new, label_new
 
 def download_and_save(number_of_categories,number_of_samples):
@@ -138,40 +128,34 @@ def data_from_file(number_of_categories,number_of_samples):
     return d, categories
 
 
-# In[9]:
+# In[211]:
 
 
 number_of_categories = 5
-number_of_samples = 100
+number_of_samples = 1000
 
 ##load data
-#d, cats = download_and_save(number_of_categories,number_of_samples)
-d, cats = data_from_file(number_of_categories,number_of_samples)
+d, cats = download_and_save(number_of_categories,number_of_samples)
+#d, cats = data_from_file(number_of_categories,number_of_samples)
 
-cat_id = np.repeat(range(number_of_categories),number_of_samples)+1
+cat_id = np.repeat(range(number_of_categories),number_of_samples)
 
 print('Categories: ', cats)
 print(np.shape(d),' ',np.shape(cat_id))
 
 
-# In[21]:
+# In[212]:
 
 
 #Shuffle data
-data,cat_id = shuff(d,cat_id,13)
+data,cat_id = shuff(d,cat_id)
 
 #reshape data into 28x28
 data = np.reshape(data,(len(data),28,28))
 print(np.shape(data),' ',np.shape(cat_id))
 
 
-# In[18]:
-
-
-data = np.reshape(d,(len(d),28,28))
-
-
-# In[22]:
+# In[213]:
 
 
 #split data
@@ -188,16 +172,16 @@ print('Train-Set: ','Samples',np.shape(x_train)[0],'/ Labels', np.shape(y_train)
 print('Test-Set: ','Samples',np.shape(x_test)[0],'/ Labels', np.shape(y_test)[0])
 
 
-# In[23]:
+# In[214]:
 
 
 #TEST Show
-i=rd.randint(1,len(x_train))
+i=random.randint(1,len(x_train))
 plt.imshow(x_train[i])
-print(cats[int(cat_id[i]-1)],i)
+print(cats[int(cat_id[i])],i)
 
 
-# In[ ]:
+# In[218]:
 
 
 model = tf.keras.models.Sequential([
@@ -217,20 +201,30 @@ model.compile(optimizer='adam',
               metrics=['accuracy'])
 
 #train the model
-model.fit(x_train, y_train,batch_size = 50, epochs=5)
+model.fit(x_train, y_train,batch_size = 32, epochs=10)
+
+#test the model
+print('Test')
+model.evaluate(x_test,  y_test, verbose=2);
 
 
-# In[44]:
+# In[ ]:
+
+
+
+
+
+# In[210]:
 
 
 batch_size = 100
-len(x_train)/batch_size
+len(x_train)
 
 
-# In[41]:
+# In[201]:
 
 
-model.evaluate(x_test,  y_test, verbose=2);
+
 
 
 # In[2]:
@@ -279,166 +273,10 @@ for i in range(batches):
 # In[ ]:
 
 
-model = tf.keras.models.Sequential([
-  tf.keras.layers.Flatten(input_shape=(28, 28)),
-  tf.keras.layers.Dense(128, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
-  tf.keras.layers.Dense(number_of_categories),
-  tf.keras.layers.Softmax()
-])
-
-#define lossfunction
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-# Run with new data
-model.compile(optimizer='adam',
-              loss=loss_fn,
-              metrics=['accuracy'])
-model.fit(x_train2, y_train2, batch_size=5, epochs=5)
-
-
-# In[1]:
-
-
-model.evaluate(x_test,  y_test, verbose=2);
-
-
-# In[25]:
-
-
-int(number_of_categories*number_of_samples/10)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
 name = "qd.h5"
 saved_model_dir = 'save/'+str(name)
 model.save(saved_model_dir)
 print('Model Saved to '+saved_model_dir)
-
-
-# In[ ]:
-
-
-#tf.saved_model.save(model,'save/')
-#converter = tf.lite.TFLiteConverter.from_keras_model_file(model)
-#Use this if 238 fails 
-converter = tf.lite.TFLiteConverter.from_keras_model(model)
-tflite_model = converter.convert()
-with open('model.tflite', 'wb') as f:
-    f.write(tflite_model)
-
-
-# In[ ]:
-
-
-model.save('save/qd_0')
-
-
-# In[ ]:
-
-
-model.summary()
-
-
-# In[ ]:
-
-
-new_model = tf.keras.models.load_model('save/qd_0')
-new_model.summary()
-
-
-# In[ ]:
-
-
-new_model.evaluate(x_test,  y_test, verbose=2);
-
-
-# In[ ]:
-
-
-predictions = new_model.predict(x_test)
-
-
-# In[ ]:
-
-
-i=2
-print(labels[np.argmax(predictions[i])])
-plt.figure()
-plt.imshow(x_test[i])
-plt.show()
-
-
-# In[ ]:
-
-
-#Show PNG
-image = Image.open('dataset/airplane3.png')
-# convert image to numpy array
-data = asarray(image)
-data = abs(data-255.)/255.
-
-# summarize shape
-print(data.shape)
-plt.imshow(image)
-plt.show()
-
-
-# In[ ]:
-
-
-#Convert png to 28x28 array
-image = Image.open('dataset/airplane3.png')
-image_resize = image.resize((28,28))
-data_resize = asarray(image_resize)
-data_resize = abs(data_resize-255.)/255.
-data_resize = data_resize[:, :, 0]
-data_resize = np.expand_dims(data_resize, axis=0)
-
-#Predict png
-predictions = new_model.predict(data_resize)
-print(labels[np.argmax(predictions)])
-print(data_resize.shape)
-plt.imshow(image_resize)
-plt.show()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 
 
 # In[ ]:
