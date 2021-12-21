@@ -8,6 +8,7 @@ import tensorflow as tf
 
 import numpy as np
 from numpy import asarray
+from sklearn.metrics import classification_report
 
 import matplotlib.pyplot as plt 
 from matplotlib import image
@@ -20,6 +21,7 @@ import requests as req
 import csv
 import os
 print(os.getcwd())
+#from sys import getsizeof
 
 import copy
 
@@ -31,6 +33,7 @@ print(tf.__version__)
 
 def download_npy(categories,number_of_samples):
 
+    #consecutive download quickdraw files from google url
     number_of_categories = len(categories)
     data = np.array([], dtype=np.int64).reshape(0,784)
     for i in range(number_of_categories):
@@ -39,7 +42,6 @@ def download_npy(categories,number_of_samples):
         
         url = 'https://storage.googleapis.com/quickdraw_dataset/full/numpy_bitmap/'+filename
         
-        print(i+1,'/',number_of_categories,' ','download ',   filename.replace("%20",""))
         r = req.get(url, allow_redirects=True)
         #filename = os.path.basename(url)
         #filename = filename.replace("%20","")
@@ -48,6 +50,7 @@ def download_npy(categories,number_of_samples):
         data = np.vstack([data,load_data(filename,number_of_samples)])
         
         os.remove(filename)
+        print(i+1,'/',number_of_categories,' ','download ',filename.replace("%20",""))
     return data
 
 def load_data(name,n):
@@ -57,9 +60,10 @@ def load_data(name,n):
     #data = np.ndarray.reshape(data,len(data),28,28)
     return data[0:n,:]
 
-#randomize data and labels
 def shuff(data,label):
     
+    #shuffle data and labels
+
     s = np.shape(data)
     n = s[0]
     
@@ -82,11 +86,11 @@ def shuff(data,label):
         data_new[i] = data[orderid[i]]
         label_new[i] = int(label[orderid[i]])
         
-    #del data, label
     return data_new, label_new
 
 def download_and_save(number_of_categories,number_of_samples):
-
+    
+    #download quickdraw samples and save as csv file
     x = [random.randint(0, 345) for p in range(0, number_of_categories)]
 
     #load categories
@@ -95,6 +99,7 @@ def download_and_save(number_of_categories,number_of_samples):
     categories = [row for row in reader]
     categories = [categories[row] for row in x]
     
+    #download data
     d = download_npy(categories,number_of_samples)
     
     #save Data
@@ -110,6 +115,7 @@ def download_and_save(number_of_categories,number_of_samples):
     
 def data_from_file(number_of_categories,number_of_samples):
     
+    #load data from csv file
     filename = 'dataset/data_{}_{}.csv'.format(number_of_categories,number_of_samples)
     d = np.loadtxt(filename, delimiter=',')
     filename = 'dataset/cat_{}_{}.csv'.format(number_of_categories,number_of_samples)
@@ -121,112 +127,164 @@ def data_from_file(number_of_categories,number_of_samples):
 
 def predict_image(path_image):
     image = Image.open(path_image)
-
     image_resize = image.resize((28,28))
     image_small= asarray(image_resize)
     image_small = abs(image_small-255.)/255.
     image_small = image_small[:, :, 0]
-    image_small = np.expand_dims(image_small, axis=0)
+    #image_small = np.expand_dims(image_small, axis=0)
     
-    predictions = model.predict(image_small)
+    data4 = np.reshape(image_small,(28,28,1))
+    data4 = np.expand_dims(data4, axis=0)
+    
+    predictions = model.predict(data4)
     print(cats[np.argmax(predictions)])
-    print(image_small.shape)
-    plt.imshow(image_resize)
+    plt.imshow(image_small)
     plt.show()
 
 
-# In[20]:
+# In[3]:
 
 
-ncat = 5
-nsam = 5000
+def define_model(number_of_categories):
+    model = tf.keras.models.Sequential()
+    model.add(tf.keras.layers.Conv2D(32, (5, 5), activation='relu', kernel_initializer='he_uniform', input_shape=(28, 28, 1)))
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.Conv2D(16, (5, 5), activation='relu', kernel_initializer='he_uniform', input_shape=(28, 28, 1)))
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.Dense(100, activation='relu', kernel_initializer='he_uniform'))
+    model.add(tf.keras.layers.Dense(number_of_categories, activation='softmax'))
+    
+    # compile model
+    opt = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9)
+    model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return model
 
-##load data
+
+# In[4]:
+
+
+ncat = 10 #number of categories
+nsam = 5000 #number of samples per category
+
+##load data specified by ncat & nsam
 d, cats = download_and_save(ncat,nsam)
 #d, cats = data_from_file(ncat,nsam)
 
+#
 cat_id = np.repeat(range(ncat),nsam)
 
 print('Categories: ', cats)
 print(np.shape(d),' ',np.shape(cat_id))
 
 
-# # FFNN
-
-# In[21]:
+# In[149]:
 
 
 #Shuffle data
 data,cat_id = shuff(d,cat_id)
+data_rs = np.reshape(data,(len(data),28,28))
 
-#reshape data into 28x28
-data = np.reshape(data,(len(data),28,28))
-print(np.shape(data),' ',np.shape(cat_id))
-
-
-# In[22]:
-
+#data to 4D
+data4 = np.reshape(data,(len(data),28,28,1))
 
 #split data
 training = 0.8
 test = 1.-training
 
-x_train = data[0:m.floor(training*len(data))]/ 255.0
+x_train = data4[0:m.floor(training*len(data4))]/ 255.0
 y_train = cat_id[0:m.floor(training*len(cat_id))]
 
-x_test = data[m.ceil(training*len(data)):len(data)]/ 255.0
+x_test = data4[m.ceil(training*len(data4)):len(data4),:]/ 255.0
 y_test = cat_id[m.ceil(training*len(cat_id)):len(cat_id)]
 
 print('Train-Set: ','Samples',np.shape(x_train)[0],'/ Labels', np.shape(y_train)[0])
 print('Test-Set: ','Samples',np.shape(x_test)[0],'/ Labels', np.shape(y_test)[0])
 
 
-# In[25]:
+# In[151]:
 
 
 #TEST Show
-i=random.randint(1,len(x_train))
-plt.imshow(x_train[i])
+i=random.randint(1,len(data_rs))
+plt.imshow(data_rs[i])
 print(cats[int(cat_id[i])],i)
 
 
-# In[26]:
+# In[153]:
 
 
-model = tf.keras.models.Sequential([
-  tf.keras.layers.Flatten(input_shape=(28, 28)),
-  tf.keras.layers.Dense(128, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
-  tf.keras.layers.Dense(64, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
-  tf.keras.layers.Dense(ncat),
-  tf.keras.layers.Softmax()
-])
+#Model and Train
+model = define_model(ncat)
+history = model.fit(x_train, y_train,batch_size = 32, epochs=5)
 
-#define lossfunction
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+_, acc = model.evaluate(x_test,  y_test, verbose=2);
 
-# Compile: set optimizer, lossfunction, error metric
-model.compile(optimizer='adam',
-              loss=loss_fn,
-              metrics=['accuracy'])
+print('Accuracy > %.3f' % (acc * 100.0))
 
-#train the model
-history = model.fit(x_train, y_train,batch_size = 32, epochs=10)
+# stores scores
+scores, histories = list(), list()
+scores.append(acc)
+histories.append(history)
 
-#test the model
-print('Test')
-model.evaluate(x_test,  y_test, verbose=2);
+
+# In[154]:
+
+
+#Test Predictions
 predictions = model.predict(x_test)
 
 
-# In[30]:
+# In[155]:
 
 
-#TEST Show
 i=random.randint(1,len(x_test))
-plt.imshow(x_test[i])
+x_test_0 = np.reshape(x_test[i],(28,28))
+plt.imshow(x_test_0)
 print(cats[np.argmax(predictions[i])])
+
+
+# In[160]:
+
+
+#predict own image
+predict_image('dataset/crown.png')
+
+
+# In[130]:
+
+
+print(history.history.keys())
+# summarize history for accuracy
+plt.plot(history.history['accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+
+# In[161]:
+
+
+#Save model
+name = "qd_cnn_sgd_10_5000.h5"
+saved_model_dir = 'save/'+str(name)
+model.save(saved_model_dir)
+print('Model Saved to '+saved_model_dir)
+
+
+# In[ ]:
+
+
+
 
 
 # In[ ]:
